@@ -12,6 +12,12 @@ import (
 	"strings"
 )
 
+func SamMID(readName string, chrom string, pos int, readString string, cigar string) {
+	output := readName + "	" + chrom + "	" + fmt.Sprint(pos+1) + "	" + cigar + "	" + readString + "\n"
+
+	fmt.Print(output)
+}
+
 func Sam(readName string, chrom string, pos int, readString string) {
 	output := readName + "	" + chrom + "	" + fmt.Sprint(pos+1) + "	" + strconv.Itoa(len(readString)) + "M" + "	" + readString + "\n"
 
@@ -122,6 +128,9 @@ type FMRecs struct {
 	BS   []int
 	O    []map[byte]int
 	C    map[byte]int
+
+	//used for Li-Durbin stopping
+	RO []map[byte]int
 }
 
 func FMParser(file *os.File) []FMRecs {
@@ -141,7 +150,6 @@ func FMParser(file *os.File) []FMRecs {
 			//avoid getting empty genomes (edgecase)
 			if len(activeRec.Bwt) != 0 {
 				activeRec.C = C
-				activeRec.O = BuildOtable(activeRec.Bwt)
 				recs = append(recs, *activeRec)
 
 			}
@@ -154,8 +162,13 @@ func FMParser(file *os.File) []FMRecs {
 			//remember to cut off @ symbol
 			bwt := []byte(line[1:])
 			activeRec.Bwt = bwt
+			activeRec.O = BuildOtable(activeRec.Bwt)
 
 		}
+		if line[0] == '_' {
+			activeRec.RO = BuildOtable([]byte(line[1:]))
+		}
+
 		if line[0] == '*' {
 			val, er := strconv.Atoi(line[2:])
 			if er != nil {
@@ -168,10 +181,47 @@ func FMParser(file *os.File) []FMRecs {
 	//remember to add last element
 	if len(activeRec.Bwt) != 0 {
 		activeRec.C = C
-		activeRec.O = BuildOtable(activeRec.Bwt)
+
 		recs = append(recs, *activeRec)
 
 	}
 
 	return recs
+}
+
+//get a cigar on compact form (MMMMMMII -> 6M2I)
+func GetCompactCigar(cigarLong []rune) string {
+	var sb strings.Builder
+
+	count := 1
+
+	//skip last idx
+	for i := len(cigarLong) - 2; i >= 0; i-- {
+
+		//if different from prev idx we save sequence
+		if cigarLong[i] != cigarLong[i+1] {
+			sb.WriteString(strconv.Itoa(count))
+			sb.WriteRune(cigarLong[i+1])
+			count = 1
+			//if identical to prev we just increment counter
+		} else {
+			count++
+		}
+
+	}
+	//last idx edgecase
+	sb.WriteString(strconv.Itoa(count))
+	sb.WriteRune(cigarLong[0])
+
+	//return reversed string because we build from back to front
+	return sb.String()
+}
+
+//used to reverse string for the Li-Durbin trick
+func ReverseStr(s string) string {
+	arr := []rune(s)
+	for i, j := 0, len(arr)-1; i < j; i, j = i+1, j-1 {
+		arr[i], arr[j] = arr[j], arr[i]
+	}
+	return string(arr)
 }

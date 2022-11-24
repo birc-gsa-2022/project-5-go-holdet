@@ -31,14 +31,22 @@ func Preprocess(genome string) {
 		}
 		sa := LsdRadixSort(gen.Rec)
 		bwt, c := FM_build(sa, gen.Rec)
+
+		//preprocessing for RO
+		r_gen := ReverseStr(gen.Rec)
+		r_gen = r_gen + "$"
+		if r_gen[0] == '$' {
+			r_gen = r_gen[1:]
+		}
+		r_sa := LsdRadixSort(r_gen)
+		rbwt, _ := FM_build(r_sa, r_gen)
+
 		//write to file
 		f.WriteString(">" + gen.Name + "\n")
-		f.WriteString("@")
-		f.Write(bwt)
-		f.WriteString("\n")
+		f.WriteString("@" + string(bwt) + "\n")
+		f.WriteString("_" + string(rbwt) + "\n")
 		for k, v := range c {
-			f.WriteString("*" + string(k) + fmt.Sprint(v))
-			f.WriteString("\n")
+			f.WriteString("*" + string(k) + fmt.Sprint(v) + "\n")
 		}
 	}
 }
@@ -53,22 +61,24 @@ func Readmap(genome, reads string, dist int) {
 	p_genomes := FMParser(f)
 	p_reads := GeneralParser(reads, Fastq)
 
-	fo, err := os.Create("./data/output.txt")
-	if err != nil {
-		panic(err)
-	}
+	/*
+		fo, err := os.Create("./data/output.txt")
+		if err != nil {
+			panic(err)
+		}*/
 
 	for _, gen := range p_genomes {
 		for _, read := range p_reads {
-			start, end := FM_search(gen.Bwt, gen.C, gen.O, read.Rec)
 
-			FM_search_approx(gen.Bwt, gen.C, gen.O, read.Rec, dist)
+			//first reconstruct SA
+			gen.BS = ReverseBWT(gen.Bwt, gen.C, gen.O)
 
-			if start != end {
-				if len(gen.BS) == 0 {
-					//this is only computed if needed
-					gen.BS = ReverseBWT(gen.Bwt, gen.C, gen.O)
-				}
+			/*start, end := FM_search(gen, read.Rec)*/
+
+			FM_search_approx(gen, read, dist)
+
+			/*if start != end {
+
 				for i := start; i < end; i++ {
 
 					Sam(read.Name, gen.Name, gen.BS[i], read.Rec)
@@ -78,8 +88,9 @@ func Readmap(genome, reads string, dist int) {
 					fo.Write([]byte(res))
 
 				}
-			}
+			}*/
 		}
 	}
 
+	//fmt.Println(kogglobal)
 }

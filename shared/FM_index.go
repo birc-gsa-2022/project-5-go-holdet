@@ -1,6 +1,8 @@
 package shared
 
-import "fmt"
+import (
+	"fmt"
+)
 
 func getSortedKeysOfCountSlice(counts map[byte]int) map[byte]int {
 	keys := make([]int, 256)
@@ -38,6 +40,45 @@ func BuildOtable(bwt []byte) []map[byte]int {
 	return o
 }
 
+/*create reverse bwt array which we use for R0.
+This could probably be done in preprocessing*/
+func BuildROtable(bwt []byte) []map[byte]int {
+	fmt.Println(bwt)
+	rbwt := make([]byte, len(bwt))
+	for i, j := 0, len(rbwt)-1; j >= 0; i, j = i+1, j-1 {
+		rbwt[i] = bwt[j]
+	}
+	fmt.Println(rbwt, bwt)
+	return BuildOtable(rbwt)
+}
+
+/*Used to terminate early in Li-Durbin
+p. 263-264 in book*/
+func BuildDTable(p string, rec FMRecs) []int {
+
+	D := make([]int, len(p))
+
+	min_edits := 0
+	L := 0
+	R := len(rec.Bwt)
+
+	for i, v := range []byte(p) {
+		a := v
+
+		L = rec.C[a] + rec.RO[L][a]
+		R = rec.C[a] + rec.RO[R][a]
+
+		if L >= R {
+			min_edits++
+			L = 0
+			R = len(rec.Bwt)
+		}
+		D[i] = min_edits
+
+	}
+	return D
+}
+
 // Data might need to represented differently
 func FM_build(sa []int, genome string) ([]byte, map[byte]int) {
 	bwt := make([]byte, len(sa))
@@ -51,7 +92,6 @@ func FM_build(sa []int, genome string) ([]byte, map[byte]int) {
 			copyOfCounts[key] = value
 		}
 
-		//add current letter to o table
 		if v == 0 {
 			bwt[i] = genome[len(sa)-1]
 		} else {
@@ -68,32 +108,6 @@ func FM_build(sa []int, genome string) ([]byte, map[byte]int) {
 	C := getSortedKeysOfCountSlice(counts)
 
 	return bwt, C
-}
-
-//locate interval for pattern p
-func FM_search(bwt []byte, C map[byte]int, O []map[byte]int, p string) (int, int) {
-	L := 0
-	R := len(bwt)
-
-	for i := len(p) - 1; i >= 0; i-- {
-		if L == R {
-			return L, R
-		}
-
-		a := p[i]
-
-		L = C[a] + O[L][a]
-		R = C[a] + O[R][a]
-	}
-	return L, R
-}
-
-func FM_search_approx(bwt []byte, C map[byte]int, O []map[byte]int, p string, k int) {
-
-	for k, v := range C {
-		fmt.Println(k, v)
-	}
-
 }
 
 func ReverseBWT(bwt []byte, C map[byte]int, O []map[byte]int) []int {
@@ -120,4 +134,90 @@ func ReverseBWT(bwt []byte, C map[byte]int, O []map[byte]int) []int {
 		bwt_idx = bar_idx
 	}
 	return rev
+}
+
+//simple function to initiate variables etc for the recursive search
+func FM_search_approx(rec FMRecs, read Recs, edits int) {
+	p := read.Rec
+	d_global = BuildDTable(p, rec)
+
+	L, R := 0, len(rec.Bwt)
+	i := len(p) - 1
+
+	x_global = rec
+	p_global = read
+	//initiate recursive search
+	RecApproxMatching(L, R, i, edits, rec, p, []rune{}, []rune{})
+
+}
+
+//right now we use a lot of global variables in an attempt to limit amount of variables getting passed around
+var kogglobal = 0
+var x_global FMRecs
+var p_global Recs
+var d_global []int
+
+func RecApproxMatching(L int, R int, idx int, edits int, rec FMRecs, p string, cigar []rune, congo []rune) {
+	kogglobal++
+
+	/*L, R interval contains matches
+	this also prevents deletions in front of match */
+	if idx == -1 {
+		if edits >= 0 {
+			matchFound(L, R, cigar, rec.BS, congo)
+		}
+		return
+	}
+
+	//we are out of available edits
+	if edits < d_global[idx] {
+		return
+	}
+
+	//take I step
+	RecApproxMatching(L, R, idx-1, edits-1, rec, p, append(cigar, 'I'), congo)
+
+	//iterate over alphabet ($ excluded)
+	for a := range rec.C {
+		if a == '$' {
+			continue
+		}
+		//decide if this letter is considered an edit
+		cost := 1
+		if p[idx] == a {
+			cost = 0
+		}
+		//no edits available
+		if edits-cost < 0 {
+			continue
+		}
+
+		//do a single FM step
+		newL := rec.C[a] + rec.O[L][a]
+		newR := rec.C[a] + rec.O[R][a]
+
+		//no interval to consider
+		if newL >= newR {
+			continue
+		}
+
+		//take M step
+		RecApproxMatching(newL, newR, idx-1, edits-cost, rec, p, append(cigar, 'M'), append(congo, rune(a)))
+
+		/*take D step
+		recursive so we do not allow first iteration (last 'cigar letter') to be a D*/
+		if len(cigar) > 0 {
+			RecApproxMatching(newL, newR, idx, edits-1, rec, p, append(cigar, 'D'), append(congo, rune(a)))
+		}
+
+	}
+}
+
+/*Should return the sam format but we need somehow to
+pass p */
+func matchFound(L int, R int, cigar []rune, sa []int, congo []rune) {
+	for i := L; i < R; i++ {
+		SamMID(p_global.Name, x_global.Name, sa[i], p_global.Rec, GetCompactCigar(cigar))
+	}
+
 }
