@@ -1,9 +1,5 @@
 package shared
 
-import (
-	"fmt"
-)
-
 func getSortedKeysOfCountSlice(counts map[byte]int) map[byte]int {
 	keys := make([]int, 256)
 	C := make(map[byte]int)
@@ -43,12 +39,10 @@ func BuildOtable(bwt []byte) []map[byte]int {
 /*create reverse bwt array which we use for R0.
 This could probably be done in preprocessing*/
 func BuildROtable(bwt []byte) []map[byte]int {
-	fmt.Println(bwt)
 	rbwt := make([]byte, len(bwt))
 	for i, j := 0, len(rbwt)-1; j >= 0; i, j = i+1, j-1 {
 		rbwt[i] = bwt[j]
 	}
-	fmt.Println(rbwt, bwt)
 	return BuildOtable(rbwt)
 }
 
@@ -166,7 +160,6 @@ func RecApproxMatching(L int, R int, idx int, edits int, rec FMRecs, p string, c
 		}
 		return
 	}
-
 	//we are out of available edits
 	if edits < d_global[idx] {
 		return

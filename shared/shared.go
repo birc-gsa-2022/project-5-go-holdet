@@ -12,8 +12,6 @@ import (
 
 func Preprocess(genome string) {
 
-	//	fmt.Println("Preprocessing:", genome)
-
 	p_genomes := GeneralParser(genome, Fasta)
 	f, err := os.Create(os.Args[2] + "zz")
 	if err != nil {
@@ -22,6 +20,10 @@ func Preprocess(genome string) {
 	defer f.Close()
 
 	for _, gen := range p_genomes {
+		//lets not consider empty genomes
+		if len(gen.Rec) == 0 {
+			continue
+		}
 		var sb strings.Builder
 		//add sentinel if missing
 		if gen.Rec[len(gen.Rec)-1] != '$' {
@@ -52,8 +54,6 @@ func Preprocess(genome string) {
 }
 
 func Readmap(genome, reads string, dist int) {
-	//fmt.Println("Redmap genome", genome, "with", reads, "within distance", dist)
-
 	f, err := os.Open(genome + "zz")
 	if err != nil {
 		panic(err)
@@ -61,36 +61,19 @@ func Readmap(genome, reads string, dist int) {
 	p_genomes := FMParser(f)
 	p_reads := GeneralParser(reads, Fastq)
 
-	/*
-		fo, err := os.Create("./data/output.txt")
-		if err != nil {
-			panic(err)
-		}*/
-
 	for _, gen := range p_genomes {
-		for _, read := range p_reads {
+		//first reconstruct SA
+		gen.BS = ReverseBWT(gen.Bwt, gen.C, gen.O)
 
-			//first reconstruct SA
-			gen.BS = ReverseBWT(gen.Bwt, gen.C, gen.O)
+		for _, read := range p_reads {
+			//lets not consider empty reads
+			if len(read.Rec) == 0 {
+				continue
+			}
 
 			/*start, end := FM_search(gen, read.Rec)*/
-
 			FM_search_approx(gen, read, dist)
-
-			/*if start != end {
-
-				for i := start; i < end; i++ {
-
-					Sam(read.Name, gen.Name, gen.BS[i], read.Rec)
-
-					res := SamStub(read.Name, gen.Name, gen.BS[i], read.Rec)
-
-					fo.Write([]byte(res))
-
-				}
-			}*/
 		}
 	}
 
-	//fmt.Println(kogglobal)
 }
