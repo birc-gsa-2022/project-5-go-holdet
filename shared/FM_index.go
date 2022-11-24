@@ -147,24 +147,22 @@ func FM_search_approx(rec FMRecs, read Recs, edits int) {
 	x_global = rec
 	p_global = read
 	//initiate recursive search
-	RecApproxMatching(L, R, i, edits, rec, p, []rune{}, []rune{})
+	RecApproxMatching(L, R, i, edits, rec, p, []rune{})
 
 }
 
 //right now we use a lot of global variables in an attempt to limit amount of variables getting passed around
-var kogglobal = 0
 var x_global FMRecs
 var p_global Recs
 var d_global []int
 
-func RecApproxMatching(L int, R int, idx int, edits int, rec FMRecs, p string, cigar []rune, congo []rune) {
-	kogglobal++
+func RecApproxMatching(L int, R int, idx int, edits int, rec FMRecs, p string, cigar []rune) {
 
 	/*L, R interval contains matches
 	this also prevents deletions in front of match */
 	if idx == -1 {
 		if edits >= 0 {
-			matchFound(L, R, cigar, rec.BS, congo)
+			matchFound(L, R, cigar, rec.BS)
 		}
 		return
 	}
@@ -175,7 +173,7 @@ func RecApproxMatching(L int, R int, idx int, edits int, rec FMRecs, p string, c
 	}
 
 	//take I step
-	RecApproxMatching(L, R, idx-1, edits-1, rec, p, append(cigar, 'I'), congo)
+	RecApproxMatching(L, R, idx-1, edits-1, rec, p, append(cigar, 'I'))
 
 	//iterate over alphabet ($ excluded)
 	for a := range rec.C {
@@ -202,12 +200,12 @@ func RecApproxMatching(L int, R int, idx int, edits int, rec FMRecs, p string, c
 		}
 
 		//take M step
-		RecApproxMatching(newL, newR, idx-1, edits-cost, rec, p, append(cigar, 'M'), append(congo, rune(a)))
+		RecApproxMatching(newL, newR, idx-1, edits-cost, rec, p, append(cigar, 'M'))
 
 		/*take D step
 		recursive so we do not allow first iteration (last 'cigar letter') to be a D*/
 		if len(cigar) > 0 {
-			RecApproxMatching(newL, newR, idx, edits-1, rec, p, append(cigar, 'D'), append(congo, rune(a)))
+			RecApproxMatching(newL, newR, idx, edits-1, rec, p, append(cigar, 'D'))
 		}
 
 	}
@@ -215,7 +213,7 @@ func RecApproxMatching(L int, R int, idx int, edits int, rec FMRecs, p string, c
 
 /*Should return the sam format but we need somehow to
 pass p */
-func matchFound(L int, R int, cigar []rune, sa []int, congo []rune) {
+func matchFound(L int, R int, cigar []rune, sa []int) {
 	for i := L; i < R; i++ {
 		SamMID(p_global.Name, x_global.Name, sa[i], p_global.Rec, GetCompactCigar(cigar))
 	}
