@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 )
 
 func Preprocess(genome string) {
@@ -61,6 +62,9 @@ func Readmap(genome, reads string, dist int) {
 	p_genomes := FMParser(f)
 	p_reads := GeneralParser(reads, Fastq)
 
+	//ensure all go routines terminate
+	var wg sync.WaitGroup
+
 	for _, gen := range p_genomes {
 		//first reconstruct SA
 		gen.BS = ReverseBWT(gen.Bwt, gen.C, gen.O)
@@ -71,9 +75,12 @@ func Readmap(genome, reads string, dist int) {
 				continue
 			}
 
-			/*start, end := FM_search(gen, read.Rec)*/
-			FM_search_approx(gen, read, dist)
+			/*Search for matches using
+			go routine cheese*/
+			wg.Add(1)
+			go FM_search_approx(gen, read, dist, &wg)
 		}
 	}
+	wg.Wait()
 
 }

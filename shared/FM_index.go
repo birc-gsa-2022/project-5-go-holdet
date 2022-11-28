@@ -1,5 +1,7 @@
 package shared
 
+import "sync"
+
 func getSortedKeysOfCountSlice(counts map[byte]int) map[byte]int {
 	keys := make([]int, 256)
 	C := make(map[byte]int)
@@ -131,51 +133,44 @@ func ReverseBWT(bwt []byte, C map[byte]int, O []map[byte]int) []int {
 }
 
 //simple function to initiate variables etc for the recursive search
-func FM_search_approx(rec FMRecs, read Recs, edits int) {
-	p := read.Rec
-	d_global = BuildDTable(p, rec)
+func FM_search_approx(rec FMRecs, read Recs, edits int, wg *sync.WaitGroup) {
+	defer wg.Done()
+	d := BuildDTable(read.Rec, rec)
 
 	L, R := 0, len(rec.Bwt)
-	i := len(p) - 1
+	i := len(read.Rec) - 1
 
-	x_global = rec
-	p_global = read
 	//initiate recursive search
-	RecApproxMatching(L, R, i, edits, rec, p, []rune{})
+	RecApproxMatching(L, R, i, edits, rec, read, d, []rune{})
 
 }
 
-//right now we use a lot of global variables in an attempt to limit amount of variables getting passed around
-var x_global FMRecs
-var p_global Recs
-var d_global []int
-
-func RecApproxMatching(L int, R int, idx int, edits int, rec FMRecs, p string, cigar []rune) {
+func RecApproxMatching(L int, R int, idx int, edits int, gen FMRecs, read Recs, d []int, cigar []rune) {
 
 	/*L, R interval contains matches
 	this also prevents deletions in front of match */
 	if idx == -1 {
 		if edits >= 0 {
-			matchFound(L, R, cigar, rec.BS)
+			matchFound(L, R, cigar, gen, read)
 		}
 		return
 	}
 	//we are out of available edits
-	if edits < d_global[idx] {
+	if edits < d[idx] {
 		return
 	}
 
 	//take I step
-	RecApproxMatching(L, R, idx-1, edits-1, rec, p, append(cigar, 'I'))
+	RecApproxMatching(L, R, idx-1, edits-1, gen, read, d, append(cigar, 'I'))
 
 	//iterate over alphabet ($ excluded)
-	for a := range rec.C {
+	for a := range gen.C {
 		if a == '$' {
 			continue
 		}
 		//decide if this letter is considered an edit
 		cost := 1
-		if p[idx] == a {
+		if read.Rec[idx] == a {
 			cost = 0
 		}
 		//no edits available
@@ -184,8 +179,8 @@ func RecApproxMatching(L int, R int, idx int, edits int, rec FMRecs, p string, c
 		}
 
 		//do a single FM step
-		newL := rec.C[a] + rec.O[L][a]
-		newR := rec.C[a] + rec.O[R][a]
+		newL := gen.C[a] + gen.O[L][a]
+		newR := gen.C[a] + gen.O[R][a]
 
 		//no interval to consider
 		if newL >= newR {
@@ -193,12 +188,12 @@ func RecApproxMatching(L int, R int, idx int, edits int, rec FMRecs, p string, c
 		}
 
 		//take M step
-		RecApproxMatching(newL, newR, idx-1, edits-cost, rec, p, append(cigar, 'M'))
+		RecApproxMatching(newL, newR, idx-1, edits-cost, gen, read, d, append(cigar, 'M'))
 
 		/*take D step
 		recursive so we do not allow first iteration (last 'cigar letter') to be a D*/
 		if len(cigar) > 0 {
-			RecApproxMatching(newL, newR, idx, edits-1, rec, p, append(cigar, 'D'))
+			RecApproxMatching(newL, newR, idx, edits-1, gen, read, d, append(cigar, 'D'))
 		}
 
 	}
@@ -206,9 +201,9 @@ func RecApproxMatching(L int, R int, idx int, edits int, rec FMRecs, p string, c
 
 /*Should return the sam format but we need somehow to
 pass p */
-func matchFound(L int, R int, cigar []rune, sa []int) {
+func matchFound(L int, R int, cigar []rune, gen FMRecs, read Recs) {
 	for i := L; i < R; i++ {
-		SamMID(p_global.Name, x_global.Name, sa[i], p_global.Rec, GetCompactCigar(cigar))
+		SamMID(read.Name, gen.Name, gen.BS[i], read.Rec, GetCompactCigar(cigar))
 	}
 
 }
