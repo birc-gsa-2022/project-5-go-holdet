@@ -5,10 +5,10 @@
 package shared
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 )
 
 func Preprocess(genome string) {
@@ -20,19 +20,23 @@ func Preprocess(genome string) {
 	}
 	defer f.Close()
 
+	//write to buffer since it allegedly should be more efficient
+	buf := bufio.NewWriter(f)
+
 	for _, gen := range p_genomes {
 		//lets not consider empty genomes
 		if len(gen.Rec) == 0 {
 			continue
 		}
 		var sb strings.Builder
+
 		//add sentinel if missing
 		if gen.Rec[len(gen.Rec)-1] != '$' {
 			sb.WriteString(gen.Rec)
 			sb.WriteRune('$')
 			gen.Rec = sb.String()
 		}
-		sa := LsdRadixSort(gen.Rec)
+		sa := Skew(gen.Rec)
 		bwt, c := FM_build(sa, gen.Rec)
 
 		//preprocessing for RO
@@ -41,20 +45,21 @@ func Preprocess(genome string) {
 		if r_gen[0] == '$' {
 			r_gen = r_gen[1:]
 		}
-		r_sa := LsdRadixSort(r_gen)
+		r_sa := Skew(r_gen)
 		rbwt, _ := FM_build(r_sa, r_gen)
 
 		//write to file
-		f.WriteString(">" + gen.Name + "\n")
-		f.WriteString("@" + string(bwt) + "\n")
-		f.WriteString("_" + string(rbwt) + "\n")
+		buf.WriteString(">" + gen.Name + "\n")
+		buf.WriteString("@" + string(bwt) + "\n")
+		buf.WriteString("_" + string(rbwt) + "\n")
 		for k, v := range c {
-			f.WriteString("*" + string(k) + fmt.Sprint(v) + "\n")
+			buf.WriteString("*" + string(k) + fmt.Sprint(v) + "\n")
 		}
+		buf.Flush()
 	}
 }
 
-func Readmap(genome, reads string, dist int) {
+func Readmap(genome string, reads string, dist int) {
 	f, err := os.Open(genome + "zz")
 	if err != nil {
 		panic(err)
@@ -63,7 +68,6 @@ func Readmap(genome, reads string, dist int) {
 	p_reads := GeneralParser(reads, Fastq)
 
 	//ensure all go routines terminate
-	var wg sync.WaitGroup
 
 	for _, gen := range p_genomes {
 		//first reconstruct SA
@@ -77,10 +81,8 @@ func Readmap(genome, reads string, dist int) {
 
 			/*Search for matches using
 			go routine cheese*/
-			wg.Add(1)
-			go FM_search_approx(gen, read, dist, &wg)
+			FM_search_approx(gen, read, dist)
 		}
 	}
-	wg.Wait()
 
 }

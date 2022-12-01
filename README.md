@@ -118,7 +118,8 @@ In order to validate further it was no longer super optimal to compare it to a p
 Later we installed the gsa tool and created larger files. We compared the results from our tool with the results from gsa and made sure that they were identical.
 
 ## Running time
-The preprocessing used in this project is the same as the one we used in project 3. It is using radix sort and in the tests made back then we showed that it runs O(n^2) as expected.
+The preprocessing used in this project is the same as the one we used in project 3. It is using radix sort and in the tests made back then we showed that it runs O(n^2) as expected...
+Until we changed it because we got skew to work - which on all our comparisons clearly outperformed our standard lsd radix. This makes sense since skew is supposed to run linear O(n)
 
 For our read mapping we use the Burrows Wheeler transformation method which runs in O(n) on preprocessed data. 
 

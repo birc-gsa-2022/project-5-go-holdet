@@ -1,7 +1,5 @@
 package shared
 
-import "sync"
-
 func getSortedKeysOfCountSlice(counts map[byte]int) map[byte]int {
 	keys := make([]int, 256)
 	C := make(map[byte]int)
@@ -133,8 +131,7 @@ func ReverseBWT(bwt []byte, C map[byte]int, O []map[byte]int) []int {
 }
 
 //simple function to initiate variables etc for the recursive search
-func FM_search_approx(rec FMRecs, read Recs, edits int, wg *sync.WaitGroup) {
-	defer wg.Done()
+func FM_search_approx(rec FMRecs, read Recs, edits int) {
 	d := BuildDTable(read.Rec, rec)
 
 	L, R := 0, len(rec.Bwt)
