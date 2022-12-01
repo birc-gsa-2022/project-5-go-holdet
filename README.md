@@ -103,18 +103,24 @@ Once you have implemented the `readmap` program (and tested it to the best of yo
 # Report
 
 ## Algorithm
-
-*Which algorithm did you use for read mapping?*
+We decided to build upon project 4 by using BWT where we recursion in order to explore all possible combinations of M I and D operations within the allowed edit distance. More specifically we implemented the Li-Durbin algorithm which reduces the amount of recursive calls needed by using early stopping.
 
 ## Insights you may have had while implementing the algorithm
-
+Life lesson: Some algorithms are easy to understand and hard to implement - and some are hard to understand but easy to implement.
 ## Problems encountered if any
+We tried to implement an algorithm for faster preprocessing (skew, SAIS) but without any luck. Especially the skew attempt worked fine on inputs smaller than 500~ but would eventually die to some bug somewhere. Very sad... 
+The read mapper part of the project not too demanding to implement - we did however spend some ting trying to remove the beginning and ending deletions.  
 
 ## Validation
 
-*How did you validate that the algorithm works?*
+First we tried to algorithm on some small homemade genomes and reads where we could easily manually validate the output.
+In order to validate further it was no longer super optimal to compare it to a previous project, since all the other project assumes an edit length of 0. We did however start by running our implementation with "-d 0" to provide a sanity check.
+Later we installed the gsa tool and created larger files. We compared the results from our tool with the results from gsa and made sure that they were identical.
 
 ## Running time
+The preprocessing used in this project is the same as the one we used in project 3. It is using radix sort and in the tests made back then we showed that it runs O(n^2) as expected.
 
-*List experiments and results that illustrates the running time. Add figures by embedding them here, as you learned how to do in project 1.*
+For our read mapping we use the Burrows Wheeler transformation method which runs in O(n) on preprocessed data. 
 
+We wanted to see how much impact the addition of the D array from li-durbin algorithm had on our runtimes, so we ran the algorithm on different size n with edit distance = 4 to see a difference. The results are shown in the image below, and at appears that there were close to no difference - or atleast the difference was dominated by some other more time demanding things at runtime. Our preprocessing limits the scale of our data at the time of writing, but otherwise it would be interesting to see if this pattern would change if we ran the algorithm on way larger genomes. 
+![](figs/lidurbin_stopping.png)
